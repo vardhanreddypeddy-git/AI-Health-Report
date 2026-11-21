@@ -2,17 +2,23 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { UserButton, useAuth } from "@clerk/react";
 import "./App.css";
 import { getTranslations, getStatusText, LANGUAGES } from "./translations";
-import { clerkTheme } from "./clerkTheme";
+import InteractiveChat from "./components/InteractiveChat";
+import { API_BASE_URL } from "./config";
 
 function App() {
-  const { getToken } = useAuth();
   const [file, setFile] = useState(null);
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem("preferred_language") || "en";
   });
+  const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [analysis, setAnalysis] = useState(null);
+  const [reportId, setReportId] = useState(null);
+  const [reportFilename, setReportFilename] = useState("");
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [pastReports, setPastReports] = useState([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [biomarkerFilter, setBiomarkerFilter] = useState("all");
   const [isDragging, setIsDragging] = useState(false);
 
@@ -25,6 +31,33 @@ function App() {
   useEffect(() => {
     localStorage.setItem("preferred_language", language);
   }, [language]);
+
+  const fetchPastReports = async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE_URL}/api/reports`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setPastReports(d.reports || []);
+      }
+    } catch (e) {
+      console.warn("Could not fetch reports history:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchPastReports();
+  }, []);
+
+  const loadSavedReport = (rep) => {
+    setAnalysis(rep.analysis);
+    setReportId(rep.id);
+    setReportFilename(rep.filename);
+    setShowHistoryModal(false);
+    setMessage(`Loaded report from database: ${rep.filename}`);
+  };
 
   const isImaging = analysis?.report_type === "imaging";
 
@@ -88,22 +121,11 @@ function App() {
     formData.append("language", language);
 
     try {
-      let token = null;
-      try {
-        if (typeof getToken === "function") {
-          token = await getToken();
-        }
-      } catch (tokenErr) {
-        console.warn("Could not retrieve Clerk session token:", tokenErr);
-      }
-
-      const headers = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
+      const token = await getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const response = await fetch(
-        "http://127.0.0.1:5000/upload",
+        `${API_BASE_URL}/upload`,
         {
           method: "POST",
           headers,
@@ -120,7 +142,10 @@ function App() {
       }
 
       setAnalysis(data.analysis);
+      setReportId(data.report_id || null);
+      setReportFilename(data.filename || file?.name || "Medical Report");
       setMessage(t.reportSuccess);
+      fetchPastReports();
     } catch (error) {
       console.error(error);
       setMessage(
@@ -132,9 +157,9 @@ function App() {
   };
 
   const getStatusIcon = (status) => {
-    if (status === "high") return "↑";
-    if (status === "low") return "↓";
-    if (status === "normal") return "✓";
+    if (status === "high") return "â†‘";
+    if (status === "low") return "â†“";
+    if (status === "normal") return "âœ“";
     return "?";
   };
 
@@ -213,8 +238,19 @@ function App() {
           </div>
 
           <div className="header-actions">
+            {pastReports && pastReports.length > 0 && (
+              <button
+                type="button"
+                className="btn-history-header"
+                onClick={() => setShowHistoryModal(true)}
+                title="View reports saved in PostgreSQL"
+              >
+                ðŸ“ Saved Reports ({pastReports.length})
+              </button>
+            )}
+
             <div className="language-dropdown-wrapper">
-              <span className="lang-icon" aria-hidden="true">🌐</span>
+              <span className="lang-icon" aria-hidden="true">ðŸŒ</span>
               <select
                 id="language"
                 aria-label={t.languageLabel || "Language selector"}
@@ -228,12 +264,10 @@ function App() {
                   </option>
                 ))}
               </select>
-              <span className="select-arrow" aria-hidden="true">▾</span>
+              <span className="select-arrow" aria-hidden="true">â–¾</span>
             </div>
 
-            <div className="user-profile-button-wrap">
-              <UserButton appearance={clerkTheme} />
-            </div>
+            <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </div>
       </header>
@@ -257,28 +291,28 @@ function App() {
 
             <div className="hero-features-grid">
               <div className="feature-card">
-                <div className="feature-icon-bubble">🧪</div>
+                <div className="feature-icon-bubble">ðŸ§ª</div>
                 <div className="feature-card-text">
                   <strong>Biomarker Extraction</strong>
                   <span>Auto-detects lab ranges & units</span>
                 </div>
               </div>
               <div className="feature-card">
-                <div className="feature-icon-bubble">🩺</div>
+                <div className="feature-icon-bubble">ðŸ©º</div>
                 <div className="feature-card-text">
                   <strong>Pattern Recognition</strong>
                   <span>Discovers related clinical signals</span>
                 </div>
               </div>
               <div className="feature-card">
-                <div className="feature-icon-bubble">🧠</div>
+                <div className="feature-icon-bubble">ðŸ§ </div>
                 <div className="feature-card-text">
                   <strong>Medical Knowledge (RAG)</strong>
                   <span>Clinical guides from CDC & MedlinePlus</span>
                 </div>
               </div>
               <div className="feature-card">
-                <div className="feature-icon-bubble">🌐</div>
+                <div className="feature-icon-bubble">ðŸŒ</div>
                 <div className="feature-card-text">
                   <strong>8 Indian Languages</strong>
                   <span>Accessible healthcare in native scripts</span>
@@ -314,7 +348,7 @@ function App() {
                 </div>
 
                 <div className="mock-patient-strip">
-                  <div className="mock-avatar">🩺</div>
+                  <div className="mock-avatar">ðŸ©º</div>
                   <div className="mock-meta-lines">
                     <span className="mock-meta-name">Comprehensive Health Panel</span>
                     <span className="mock-meta-sub">Blood Chemistry & Imaging Summary</span>
@@ -332,7 +366,7 @@ function App() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="ecg-status-text">Vital Signals Active • 72 BPM</span>
+                  <span className="ecg-status-text">Vital Signals Active â€¢ 72 BPM</span>
                 </div>
 
                 {/* Mock biomarker rows */}
@@ -363,7 +397,7 @@ function App() {
 
               {/* Floating Analytical Badges */}
               <div className="floating-badge badge-ai-confidence">
-                <span className="sparkle-icon">✨</span>
+                <span className="sparkle-icon">âœ¨</span>
                 <div className="badge-text">
                   <strong>AI Confidence</strong>
                   <span>99.4% Extraction Rate</span>
@@ -382,7 +416,7 @@ function App() {
         <div className="upload-card">
           <div className="upload-card-header">
             <div className="upload-badge-pill">
-              <span className="upload-pill-icon">📁</span>
+              <span className="upload-pill-icon">ðŸ“</span>
               <span>Fast & Structured Extraction</span>
             </div>
             <h3>{t.uploadTitle}</h3>
@@ -442,10 +476,10 @@ function App() {
                   <div className="file-type-icon">PDF</div>
                   <div className="file-meta">
                     <span className="file-name">{file.name}</span>
-                    <span className="file-size">{formatFileSize(file.size)} • {t.pdfSelected}</span>
+                    <span className="file-size">{formatFileSize(file.size)} â€¢ {t.pdfSelected}</span>
                   </div>
                   <div className="file-ready-chip">
-                    <span className="check-mark">✓</span>
+                    <span className="check-mark">âœ“</span>
                     <span>Ready</span>
                   </div>
                 </div>
@@ -457,7 +491,7 @@ function App() {
                     fileInputRef.current?.click();
                   }}
                 >
-                  🔄 {t.changeFile || "Select a different file"}
+                  ðŸ”„ {t.changeFile || "Select a different file"}
                 </button>
               </div>
             )}
@@ -492,14 +526,14 @@ function App() {
           {message && (
             <div
               className={`status-banner ${
-                message.includes("success") || message.includes("सफलतापूर्वक") || message.includes("విజయవంతంగా") || message.includes("வெற்றிகரமாக")
+                message.includes("success") || message.includes("à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤•") || message.includes("à°µà°¿à°œà°¯à°µà°‚à°¤à°‚à°—à°¾") || message.includes("à®µà¯†à®±à¯à®±à®¿à®•à®°à®®à®¾à®•")
                   ? "banner-success"
                   : "banner-info"
               }`}
               role="alert"
             >
               <span className="banner-icon">
-                {message.includes("success") || message.includes("सफलतापूर्वक") ? "✓" : "ℹ"}
+                {message.includes("success") || message.includes("à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤•") ? "âœ“" : "â„¹"}
               </span>
               <span>{message}</span>
             </div>
@@ -525,13 +559,23 @@ function App() {
           </div>
 
           {analysis && (
-            <div className="report-type-badge">
-              <span className="report-type-icon">{isImaging ? "🩻" : "🧪"}</span>
-              <span className="report-type-text">
-                {analysis.report_type === "imaging"
-                  ? (t.imagingReport || "Imaging Diagnostic Scan")
-                  : (t.labReport || "Laboratory Analysis Report")}
-              </span>
+            <div className="dashboard-actions-row">
+              <button
+                type="button"
+                className="btn-chat-trigger-top"
+                onClick={() => setIsChatOpen(true)}
+                title="Ask questions about this report"
+              >
+                ðŸ’¬ Ask Health AI
+              </button>
+              <div className="report-type-badge">
+                <span className="report-type-icon">{isImaging ? "ðŸ©»" : "ðŸ§ª"}</span>
+                <span className="report-type-text">
+                  {analysis.report_type === "imaging"
+                    ? (t.imagingReport || "Imaging Diagnostic Scan")
+                    : (t.labReport || "Laboratory Analysis Report")}
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -540,28 +584,28 @@ function App() {
         {analysis && !isImaging && biomarkerStats.total > 0 && (
           <div className="summary-cards-grid">
             <div className="summary-card card-total">
-              <div className="summary-icon">📊</div>
+              <div className="summary-icon">ðŸ“Š</div>
               <div className="summary-info">
                 <span className="summary-count">{biomarkerStats.total}</span>
                 <span className="summary-label">{t.filterAll || "Total Tests"}</span>
               </div>
             </div>
             <div className="summary-card card-normal">
-              <div className="summary-icon">🟢</div>
+              <div className="summary-icon">ðŸŸ¢</div>
               <div className="summary-info">
                 <span className="summary-count">{biomarkerStats.normal}</span>
                 <span className="summary-label">{t.filterNormal || "Normal"}</span>
               </div>
             </div>
             <div className="summary-card card-high">
-              <div className="summary-icon">🔴</div>
+              <div className="summary-icon">ðŸ”´</div>
               <div className="summary-info">
                 <span className="summary-count">{biomarkerStats.high}</span>
                 <span className="summary-label">{t.statusHigh || "High"}</span>
               </div>
             </div>
             <div className="summary-card card-low">
-              <div className="summary-icon">🟠</div>
+              <div className="summary-icon">ðŸŸ </div>
               <div className="summary-info">
                 <span className="summary-count">{biomarkerStats.low}</span>
                 <span className="summary-label">{t.statusLow || "Low"}</span>
@@ -569,7 +613,7 @@ function App() {
             </div>
             {biomarkerStats.unknown > 0 && (
               <div className="summary-card card-unknown">
-                <div className="summary-icon">⚪</div>
+                <div className="summary-icon">âšª</div>
                 <div className="summary-info">
                   <span className="summary-count">{biomarkerStats.unknown}</span>
                   <span className="summary-label">{t.statusUnknown || "Unclassified"}</span>
@@ -610,7 +654,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-state-box">
-                  <span className="empty-icon">📄</span>
+                  <span className="empty-icon">ðŸ“„</span>
                   <p>{t.uploadPromptImpression}</p>
                 </div>
               )}
@@ -645,7 +689,7 @@ function App() {
                 >
                   <div className="concern-status-header">
                     <span className="concern-status-indicator">
-                      {analysis.concern_level.level === "low" ? "🟢" : "🟠"}
+                      {analysis.concern_level.level === "low" ? "ðŸŸ¢" : "ðŸŸ "}
                     </span>
                     <strong className="concern-title-text">
                       {analysis.concern_level.label}
@@ -657,7 +701,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-state-box">
-                  <span className="empty-icon">⏳</span>
+                  <span className="empty-icon">â³</span>
                   <strong>{t.waitingForAnalysis}</strong>
                   <p>{t.waitingDescription}</p>
                 </div>
@@ -674,7 +718,7 @@ function App() {
           <section className="card findings-card">
             <div className="card-header">
               <div className="card-header-icon card-icon-imaging">
-                🩻
+                ðŸ©»
               </div>
               <div className="card-header-titles">
                 <div className="section-tag-pill purple">Radiology Observations</div>
@@ -689,7 +733,7 @@ function App() {
                   {analysis.findings.map((finding, index) => (
                     <div className="finding-item" key={`${finding.organ}-${index}`}>
                       <div className="finding-organ-badge">
-                        <span className="finding-pin">📍</span>
+                        <span className="finding-pin">ðŸ“</span>
                         <strong>{finding.organ}</strong>
                       </div>
                       <p className="finding-desc">{finding.description}</p>
@@ -714,7 +758,7 @@ function App() {
             <div className="card-header biomarker-header-split">
               <div className="biomarker-title-wrap">
                 <div className="card-header-icon card-icon-biomarker">
-                  🧪
+                  ðŸ§ª
                 </div>
                 <div className="card-header-titles">
                   <div className="section-tag-pill teal">Laboratory Data</div>
@@ -823,7 +867,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-state-box">
-                  <span className="empty-icon">🧪</span>
+                  <span className="empty-icon">ðŸ§ª</span>
                   <p>{analysis ? t.noBiomarkers : t.uploadPromptBiomarkers}</p>
                 </div>
               )}
@@ -839,7 +883,7 @@ function App() {
           <section className="card patterns-card">
             <div className="card-header">
               <div className="card-header-icon card-icon-pattern">
-                🔎
+                ðŸ”Ž
               </div>
               <div className="card-header-titles">
                 <div className="section-tag-pill green">Clinical Correlations</div>
@@ -863,7 +907,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-state-box">
-                  <span className="empty-icon">🔎</span>
+                  <span className="empty-icon">ðŸ”Ž</span>
                   <p>{analysis ? t.noPatterns : t.uploadPromptPatterns}</p>
                 </div>
               )}
@@ -878,7 +922,7 @@ function App() {
         <section className="card knowledge-card">
           <div className="card-header">
             <div className="card-header-icon card-icon-knowledge">
-              🧠
+              ðŸ§ 
             </div>
             <div className="card-header-titles">
               <div className="section-tag-pill indigo">Evidence-Based RAG</div>
@@ -904,7 +948,7 @@ function App() {
                     {item.source && (
                       <div className="knowledge-footer">
                         <span className="source-tag">
-                          📚 {t.source} {item.source}
+                          ðŸ“š {t.source} {item.source}
                         </span>
                       </div>
                     )}
@@ -913,7 +957,7 @@ function App() {
               </div>
             ) : (
               <div className="empty-state-box">
-                <span className="empty-icon">📚</span>
+                <span className="empty-icon">ðŸ“š</span>
                 <p>{analysis ? t.noKnowledge : t.uploadPromptKnowledge}</p>
               </div>
             )}
@@ -927,7 +971,7 @@ function App() {
         <section className="card doctor-card">
           <div className="card-header">
             <div className="card-header-icon card-icon-doctor">
-              👨‍⚕️
+              ðŸ‘¨â€âš•ï¸
             </div>
             <div className="card-header-titles">
               <div className="section-tag-pill teal">Physician Checklist</div>
@@ -938,7 +982,7 @@ function App() {
 
           <div className="card-body">
             <div className="doctor-note-banner">
-              <span className="doctor-note-icon">💡</span>
+              <span className="doctor-note-icon">ðŸ’¡</span>
               <span>{t.doctorNote || "Bring these questions to your next healthcare appointment to discuss with your doctor."}</span>
             </div>
 
@@ -966,38 +1010,38 @@ function App() {
 
 
         {/* ========================================================
-            CHATBOT ASSISTANT CARD (INTERACTIVE PREVIEW)
+            CHATBOT ASSISTANT CARD (INTERACTIVE)
             ======================================================== */}
         <section className="card chatbot-card">
           <div className="card-header">
             <div className="card-header-icon card-icon-chat">
-              💬
+              ðŸ’¬
             </div>
             <div className="card-header-titles">
-              <div className="section-tag-pill slate">AI Assistant</div>
-              <h3>{t.chatbotTitle}</h3>
-              <p>{t.chatbotSubtitle}</p>
+              <div className="section-tag-pill slate">Interactive AI Assistant</div>
+              <h3>{t.chatbotTitle || "Health Report Assistant"}</h3>
+              <p>{t.chatbotSubtitle || "Ask questions about your clinical values, abnormal flags, or diet"}</p>
             </div>
           </div>
 
           <div className="card-body">
             <div className="chatbot-wrapper">
               <div className="bot-bubble">
-                <span className="bot-avatar">🤖</span>
+                <span className="bot-avatar">ðŸ¤–</span>
                 <div className="bubble-content">
-                  {t.chatbotWelcome}
+                  {analysis
+                    ? "I have analyzed your medical report! You can chat with me in real-time to understand abnormal values, clinical impressions, or recommended questions for your doctor."
+                    : t.chatbotWelcome || "Upload a report to chat about your findings, or ask general clinical questions."}
                 </div>
               </div>
 
-              <div className="chat-input-bar">
-                <input
-                  type="text"
-                  placeholder={t.chatPlaceholder}
-                  disabled
-                  aria-label="Ask medical report question"
-                />
-                <button disabled className="btn-chat-send">
-                  {t.sendButton}
+              <div style={{ marginTop: "14px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn-chat-trigger-top"
+                  onClick={() => setIsChatOpen(true)}
+                >
+                  ðŸ’¬ Open Live Interactive Assistant
                 </button>
               </div>
             </div>
@@ -1010,7 +1054,7 @@ function App() {
             ======================================================== */}
         <section className="disclaimer-banner">
           <div className="disclaimer-icon-wrap" aria-hidden="true">
-            ⚖️
+            âš–ï¸
           </div>
           <div className="disclaimer-copy">
             <h4>{t.disclaimerTitle}</h4>
@@ -1025,16 +1069,72 @@ function App() {
           ======================================================== */}
       <footer className="app-footer">
         <div className="footer-inner">
-          <p>© {new Date().getFullYear()} AI Health Report Interpreter • Clinical AI Healthcare Platform</p>
+          <p>Â© {new Date().getFullYear()} AI Health Report Interpreter â€¢ Clinical AI Healthcare Platform</p>
           <div className="footer-links">
             <span>Confidential & Educational</span>
-            <span>•</span>
+            <span>â€¢</span>
             <span>Evidence-based Clinical AI</span>
-            <span>•</span>
+            <span>â€¢</span>
             <span>8 Regional Languages</span>
           </div>
         </div>
       </footer>
+
+      {/* Floating Interactive Chat Drawer (Google Gemini / Clinical AI) */}
+      <InteractiveChat
+        isOpen={isChatOpen}
+        onToggle={() => setIsChatOpen((prev) => !prev)}
+        reportId={reportId}
+        reportFilename={reportFilename}
+        language={language}
+        getToken={getToken}
+        t={t}
+      />
+
+      {/* PostgreSQL Saved Reports History Modal */}
+      {showHistoryModal && (
+        <div className="modal-backdrop" onClick={() => setShowHistoryModal(false)}>
+          <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="history-modal-header">
+              <h3>ðŸ“ Saved Medical Reports (PostgreSQL)</h3>
+              <button
+                type="button"
+                className="btn-modal-close"
+                onClick={() => setShowHistoryModal(false)}
+              >
+                âœ•
+              </button>
+            </div>
+            <div className="history-modal-body">
+              {pastReports.length === 0 ? (
+                <p className="history-empty-text">No previous reports saved in database yet.</p>
+              ) : (
+                pastReports.map((rep) => (
+                  <div key={rep.id} className="history-item-card">
+                    <div className="history-item-meta">
+                      <span className="history-filename">{rep.filename}</span>
+                      <div className="history-subdetails">
+                        <span className="history-type-chip">{rep.report_type}</span>
+                        <span>â€¢</span>
+                        <span>{new Date(rep.created_at).toLocaleDateString()}</span>
+                        <span>â€¢</span>
+                        <span>{(rep.biomarkers || []).length} biomarkers</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-load-report"
+                      onClick={() => loadSavedReport(rep)}
+                    >
+                      View Report
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

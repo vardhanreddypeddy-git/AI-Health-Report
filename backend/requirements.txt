@@ -6,3 +6,10 @@ Pillow
 Werkzeug
 google-genai
 python-dotenv
+clerk-backend-api
+SQLAlchemy
+psycopg2-binary
+pg8000
+httpx
+pytest
+gunicorn

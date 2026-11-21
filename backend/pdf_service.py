@@ -58,21 +58,14 @@ def ocr_page(page):
     """
     OCR a scanned PDF page and return plain text.
     """
-
-    image = render_page_as_image(
-        page
-    )
-
-    image = prepare_image_for_ocr(
-        image
-    )
-
-    text = pytesseract.image_to_string(
-        image,
-        config="--psm 6"
-    )
-
-    return text.strip()
+    try:
+        image = render_page_as_image(page)
+        image = prepare_image_for_ocr(image)
+        text = pytesseract.image_to_string(image, config="--psm 6")
+        return text.strip()
+    except Exception as err:
+        print(f"OCR page warning: {type(err).__name__} - {err}")
+        return ""
 
 
 # =========================================================
@@ -86,20 +79,17 @@ def ocr_page_with_positions(page):
     This is important because the biomarker parser needs
     to understand which value belongs to which test.
     """
-
-    image = render_page_as_image(
-        page
-    )
-
-    image = prepare_image_for_ocr(
-        image
-    )
-
-    data = pytesseract.image_to_data(
-        image,
-        output_type=Output.DICT,
-        config="--psm 6"
-    )
+    try:
+        image = render_page_as_image(page)
+        image = prepare_image_for_ocr(image)
+        data = pytesseract.image_to_data(
+            image,
+            output_type=Output.DICT,
+            config="--psm 6"
+        )
+    except Exception as err:
+        print(f"OCR word positions warning: {type(err).__name__} - {err}")
+        return []
 
     words = []
 

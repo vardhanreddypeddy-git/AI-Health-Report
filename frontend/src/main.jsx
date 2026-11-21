@@ -1,59 +1,27 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ClerkProvider } from "@clerk/react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./index.css";
 import App from "./App.jsx";
-import SignInPage from "./pages/SignInPage.jsx";
-import SignUpPage from "./pages/SignUpPage.jsx";
-import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import PublicOnlyRoute from "./components/PublicOnlyRoute.jsx";
-import MissingKeyScreen from "./components/MissingKeyScreen.jsx";
+import { SignInPage } from "./pages/SignInPage.jsx";
+import { SignUpPage } from "./pages/SignUpPage.jsx";
+import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
+import { PublicOnlyRoute } from "./components/PublicOnlyRoute.jsx";
+import { MissingKeyScreen } from "./components/MissingKeyScreen.jsx";
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 function Root() {
-  if (!PUBLISHABLE_KEY) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/sign-in/*" element={<MissingKeyScreen />} />
-          <Route path="/sign-up/*" element={<MissingKeyScreen />} />
-          <Route path="/" element={<MissingKeyScreen />} />
-          <Route path="*" element={<Navigate to="/sign-in" replace />} />
-        </Routes>
-      </BrowserRouter>
-    );
-  }
+  if (!clerkPublishableKey) return <MissingKeyScreen />;
 
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/sign-in">
+    <ClerkProvider publishableKey={clerkPublishableKey}>
       <BrowserRouter>
         <Routes>
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <App />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/sign-in/*"
-            element={
-              <PublicOnlyRoute>
-                <SignInPage />
-              </PublicOnlyRoute>
-            }
-          />
-          <Route
-            path="/sign-up/*"
-            element={
-              <PublicOnlyRoute>
-                <SignUpPage />
-              </PublicOnlyRoute>
-            }
-          />
+          <Route path="/sign-in/*" element={<PublicOnlyRoute><SignInPage /></PublicOnlyRoute>} />
+          <Route path="/sign-up/*" element={<PublicOnlyRoute><SignUpPage /></PublicOnlyRoute>} />
+          <Route path="/" element={<ProtectedRoute><App /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
