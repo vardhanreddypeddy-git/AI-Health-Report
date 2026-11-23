@@ -37,7 +37,7 @@ function App() {
   const fileInputRef = useRef(null);
 
   // Active translation dictionary
-  const t = getTranslations(language);
+  const t = useMemo(() => getTranslations(language), [language]);
 
   // Persist language choice in localStorage
   useEffect(() => {
@@ -51,7 +51,7 @@ function App() {
       setAnalysis(active.analysis);
       setReportId(active.id);
       setReportFilename(active.filename || "Medical Report");
-      setMessage(`${t.restoredFromLocal || "Restored previous report from local storage"}: ${active.filename}`);
+      setMessage(`${t.historyRestored}: ${active.filename}`);
     }
   }, []);
 
@@ -93,8 +93,8 @@ function App() {
     setReportFilename(rep.filename);
     setActiveReportInLocalStorage(rep);
     setShowHistoryModal(false);
-    const srcLabel = rep.source === "database" ? "database" : "local storage";
-    setMessage(`Loaded report from ${srcLabel}: ${rep.filename}`);
+    const srcLabel = rep.source === "database" ? t.storageCloud : t.storageLocal;
+    setMessage(`${t.historyLoaded} ${srcLabel}: ${rep.filename}`);
   };
 
   const handleClearCurrentReport = () => {
@@ -119,10 +119,7 @@ function App() {
   };
 
   const handleClearAllLocalReports = () => {
-    const confirmMsg =
-      t.clearLocalConfirm ||
-      "Are you sure you want to delete all locally stored medical reports from this browser?";
-    if (window.confirm(confirmMsg)) {
+    if (window.confirm(t.historyClearConfirm)) {
       clearAllLocalStorageReports();
       setLocalReports([]);
       if (!reportId || String(reportId).startsWith("local_")) {
@@ -401,7 +398,7 @@ function App() {
             </div>
             <div className="brand-info">
               <h1 className="brand-title">{t.appTitle}</h1>
-              <span className="brand-badge">Clinical AI Intelligence</span>
+              <span className="brand-badge">{t.brandSubtitle}</span>
             </div>
           </div>
 
@@ -411,9 +408,9 @@ function App() {
                 type="button"
                 className="btn-history-header"
                 onClick={() => setShowHistoryModal(true)}
-                title={t.savedReportsModalTitle || "View saved reports"}
+                title={t.historyModalTitle}
               >
-                📁 {t.savedReports || "Saved Reports"} ({mergedReports.length})
+                📁 {t.historyAll} ({mergedReports.length})
               </button>
             )}
 
@@ -450,7 +447,7 @@ function App() {
           <div className="hero-content">
             <div className="hero-pill">
               <span className="pill-dot"></span>
-              <span>Advanced Healthcare Technology Platform</span>
+              <span>{t.heroPlatform}</span>
             </div>
             <h2 className="hero-title">{t.welcomeTitle || "Understand Your Health Reports with AI"}</h2>
             <p className="hero-subtitle">
@@ -461,29 +458,29 @@ function App() {
               <div className="feature-card">
                 <div className="feature-icon-bubble">🧪</div>
                 <div className="feature-card-text">
-                  <strong>Biomarker Extraction</strong>
-                  <span>Auto-detects lab ranges & units</span>
+                  <strong>{t.biomarkerTitle}</strong>
+                  <span>{t.biomarkerSubtitle}</span>
                 </div>
               </div>
               <div className="feature-card">
                 <div className="feature-icon-bubble">🩺</div>
                 <div className="feature-card-text">
-                  <strong>Pattern Recognition</strong>
-                  <span>Discovers related clinical signals</span>
+                  <strong>{t.patternsTitle}</strong>
+                  <span>{t.patternsSubtitle}</span>
                 </div>
               </div>
               <div className="feature-card">
                 <div className="feature-icon-bubble">🧠</div>
                 <div className="feature-card-text">
-                  <strong>Medical Knowledge (RAG)</strong>
-                  <span>Clinical guides from CDC & MedlinePlus</span>
+                  <strong>{t.knowledgeTitle}</strong>
+                  <span>{t.knowledgeSubtitle}</span>
                 </div>
               </div>
               <div className="feature-card">
                 <div className="feature-icon-bubble">🌐</div>
                 <div className="feature-card-text">
-                  <strong>8 Indian Languages</strong>
-                  <span>Accessible healthcare in native scripts</span>
+                  <strong>{t.footerLanguages}</strong>
+                  <span>{t.appSubtitle}</span>
                 </div>
               </div>
             </div>
@@ -512,14 +509,14 @@ function App() {
                     <span className="mock-dot yellow"></span>
                     <span className="mock-dot green"></span>
                   </div>
-                  <span className="mock-doc-id">DIAGNOSTIC REPORT #2604</span>
+                  <span className="mock-doc-id">{t.reportTypeLabel}</span>
                 </div>
 
                 <div className="mock-patient-strip">
                   <div className="mock-avatar">🩺</div>
                   <div className="mock-meta-lines">
-                    <span className="mock-meta-name">Comprehensive Health Panel</span>
-                    <span className="mock-meta-sub">Blood Chemistry & Imaging Summary</span>
+                    <span className="mock-meta-name">{t.reportOverview}</span>
+                    <span className="mock-meta-sub">{t.summaryMetrics}</span>
                   </div>
                 </div>
 
@@ -534,7 +531,7 @@ function App() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="ecg-status-text">Vital Signals Active • 72 BPM</span>
+                  <span className="ecg-status-text">{t.imagingSubtitle}</span>
                 </div>
 
                 {/* Mock biomarker rows */}
@@ -567,8 +564,8 @@ function App() {
               <div className="floating-badge badge-ai-confidence">
                 <span className="sparkle-icon">✨</span>
                 <div className="badge-text">
-                  <strong>AI Confidence</strong>
-                  <span>99.4% Extraction Rate</span>
+                <strong>{t.knowledgeTitle}</strong>
+                <span>{t.resultsFound}</span>
                 </div>
               </div>
             </div>
@@ -585,7 +582,7 @@ function App() {
           <div className="upload-card-header">
             <div className="upload-badge-pill">
               <span className="upload-pill-icon">📁</span>
-              <span>Fast & Structured Extraction</span>
+              <span>{t.uploadBadge}</span>
             </div>
             <h3>{t.uploadTitle}</h3>
             <p>{t.uploadDescription}</p>
@@ -604,7 +601,7 @@ function App() {
                 fileInputRef.current?.click();
               }
             }}
-            aria-label="Upload PDF medical report"
+            aria-label={t.uploadAriaLabel}
           >
             <input
               ref={fileInputRef}
@@ -648,7 +645,7 @@ function App() {
                   </div>
                   <div className="file-ready-chip">
                     <span className="check-mark">✓</span>
-                    <span>Ready</span>
+                    <span>{t.ready}</span>
                   </div>
                 </div>
                 <button
@@ -687,7 +684,7 @@ function App() {
           {loading && (
             <div className="loading-progress-hint">
               <div className="pulse-bar"></div>
-              <span>Processing document with PyMuPDF, OCR & Medical Rules...</span>
+              <span>{t.processingReport}</span>
             </div>
           )}
 
@@ -733,36 +730,36 @@ function App() {
                   type="button"
                   className="btn-saved-localstorage"
                   onClick={handleRemoveFromPermanentLocalStorage}
-                  title="Stored permanently in your browser's internal localStorage. Click to remove."
+                title={t.historyDeleteTitle}
                 >
                   <span className="save-btn-icon">✓</span>
-                  <span>Saved on This Laptop</span>
+                  <span>{t.savedOnLaptop}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   className="btn-add-localstorage"
                   onClick={handleSaveToPermanentLocalStorage}
-                  title="Save permanently to this laptop's browser localStorage"
+                title={t.addToStorage}
                 >
                   <span className="save-btn-icon">💾</span>
-                  <span>Add to My Local Storage (This Laptop)</span>
+                  <span>{t.addToStorage}</span>
                 </button>
               )}
               <button
                 type="button"
                 className="btn-download-report"
                 onClick={handleDownloadReportFile}
-                title="Download the analyzed report as a PDF"
+                title={t.downloadPdf}
               >
                 <span className="save-btn-icon">📄</span>
-                <span>Download as PDF</span>
+                <span>{t.downloadPdf}</span>
               </button>
               <button
                 type="button"
                 className="btn-chat-trigger-top"
                 onClick={() => setIsChatOpen(true)}
-                title="Ask questions about this report"
+                title={t.chatbotTitle}
               >
                 💬 Ask Health AI
               </button>
@@ -847,7 +844,7 @@ function App() {
                 </svg>
               </div>
               <div className="card-header-titles">
-                <div className="section-tag-pill navy">Clinical Summary</div>
+                <div className="section-tag-pill navy">{t.clinicalSummaryTag}</div>
                 <h3>{t.impressionTitle}</h3>
                 <p>{t.impressionSubtitle}</p>
               </div>
@@ -878,7 +875,7 @@ function App() {
                 </svg>
               </div>
               <div className="card-header-titles">
-                <div className="section-tag-pill amber">Triage Assessment</div>
+                <div className="section-tag-pill amber">{t.triageTag}</div>
                 <h3>{t.concernTitle}</h3>
                 <p>{t.concernSubtitle}</p>
               </div>
@@ -927,7 +924,7 @@ function App() {
                 🩻
               </div>
               <div className="card-header-titles">
-                <div className="section-tag-pill purple">Radiology Observations</div>
+                <div className="section-tag-pill purple">{t.radiologyTag}</div>
                 <h3>{t.imagingTitle}</h3>
                 <p>{t.imagingSubtitle}</p>
               </div>
@@ -967,14 +964,14 @@ function App() {
                   🧪
                 </div>
                 <div className="card-header-titles">
-                  <div className="section-tag-pill teal">Laboratory Data</div>
+                  <div className="section-tag-pill teal">{t.laboratoryTag}</div>
                   <h3>{t.biomarkerTitle}</h3>
                   <p>{t.biomarkerSubtitle}</p>
                 </div>
               </div>
 
               {analysis && analysis.biomarkers && analysis.biomarkers.length > 0 && (
-                <div className="filter-tab-bar" role="tablist" aria-label="Filter biomarkers">
+                <div className="filter-tab-bar" role="tablist" aria-label={t.biomarkerTitle}>
                   <button
                     className={`filter-btn ${biomarkerFilter === "all" ? "filter-active" : ""}`}
                     onClick={() => setBiomarkerFilter("all")}
@@ -1092,7 +1089,7 @@ function App() {
                 🔎
               </div>
               <div className="card-header-titles">
-                <div className="section-tag-pill green">Clinical Correlations</div>
+                <div className="section-tag-pill green">{t.correlationsTag}</div>
                 <h3>{t.patternsTitle}</h3>
                 <p>{t.patternsSubtitle}</p>
               </div>
@@ -1131,7 +1128,7 @@ function App() {
               🧠
             </div>
             <div className="card-header-titles">
-              <div className="section-tag-pill indigo">Evidence-Based RAG</div>
+              <div className="section-tag-pill indigo">{t.evidenceTag}</div>
               <h3>{t.knowledgeTitle}</h3>
               <p>{t.knowledgeSubtitle}</p>
             </div>
@@ -1180,7 +1177,7 @@ function App() {
               👨‍⚕️
             </div>
             <div className="card-header-titles">
-              <div className="section-tag-pill teal">Physician Checklist</div>
+              <div className="section-tag-pill teal">{t.physicianTag}</div>
               <h3>{t.doctorTitle}</h3>
               <p>{t.doctorSubtitle}</p>
             </div>
@@ -1224,7 +1221,7 @@ function App() {
               💬
             </div>
             <div className="card-header-titles">
-              <div className="section-tag-pill slate">Interactive AI Assistant</div>
+              <div className="section-tag-pill slate">{t.assistantTag}</div>
               <h3>{t.chatbotTitle || "Health Report Assistant"}</h3>
               <p>{t.chatbotSubtitle || "Ask questions about your clinical values, abnormal flags, or diet"}</p>
             </div>
@@ -1235,9 +1232,7 @@ function App() {
               <div className="bot-bubble">
                 <span className="bot-avatar">🤖</span>
                 <div className="bubble-content">
-                  {analysis
-                    ? "I have analyzed your medical report! You can chat with me in real-time to understand abnormal values, clinical impressions, or recommended questions for your doctor."
-                    : t.chatbotWelcome || "Upload a report to chat about your findings, or ask general clinical questions."}
+                  {t.chatbotWelcome}
                 </div>
               </div>
 
@@ -1247,7 +1242,7 @@ function App() {
                   className="btn-chat-trigger-top"
                   onClick={() => setIsChatOpen(true)}
                 >
-                  💬 Open Live Interactive Assistant
+                  💬 {t.chatOpen}
                 </button>
               </div>
             </div>
@@ -1275,13 +1270,13 @@ function App() {
           ======================================================== */}
       <footer className="app-footer">
         <div className="footer-inner">
-          <p>© {new Date().getFullYear()} AI Health Report Interpreter • Clinical AI Healthcare Platform</p>
+          <p>© {new Date().getFullYear()} {t.appTitle} • {t.brandSubtitle}</p>
           <div className="footer-links">
-            <span>Confidential & Educational</span>
+            <span>{t.footerConfidential}</span>
             <span>•</span>
-            <span>Evidence-based Clinical AI</span>
+            <span>{t.footerEvidence}</span>
             <span>•</span>
-            <span>8 Regional Languages</span>
+            <span>{t.footerLanguages}</span>
           </div>
         </div>
       </footer>
@@ -1304,14 +1299,14 @@ function App() {
           <div className="history-modal" onClick={(e) => e.stopPropagation()}>
             <div className="history-modal-header">
               <div className="history-modal-title-wrap">
-                <h3>📁 {t.savedReportsModalTitle || "Saved Medical Reports"}</h3>
+                <h3>📁 {t.historyModalTitle}</h3>
                 <span className="history-modal-count-badge">{mergedReports.length}</span>
               </div>
               <button
                 type="button"
                 className="btn-modal-close"
                 onClick={() => setShowHistoryModal(false)}
-                aria-label="Close modal"
+                aria-label={t.closeReport}
               >
                 ✕
               </button>
@@ -1320,7 +1315,7 @@ function App() {
             {/* Modal Toolbar: All Reports & Export */}
             <div className="history-modal-toolbar">
               <span className="history-all-reports-label">
-                {t.allReportsTab || "All Reports"} ({mergedReports.length})
+                {t.historyAll} ({mergedReports.length})
               </span>
               <div className="history-toolbar-actions">
                 {localReports.length > 0 && (
@@ -1328,9 +1323,9 @@ function App() {
                     type="button"
                     className="btn-history-tool"
                     onClick={exportReportsAsJSON}
-                    title="Download JSON backup of local reports"
+                    title={t.historyExport}
                   >
-                    📥 {t.exportReports || "Export JSON"}
+                    📥 {t.historyExport}
                   </button>
                 )}
               </div>
@@ -1339,7 +1334,7 @@ function App() {
             <div className="history-modal-body">
               {mergedReports.length === 0 ? (
                 <div className="history-empty-text">
-                  <p>{t.noSavedReports || "No saved reports found."}</p>
+                  <p>{t.historyEmpty}</p>
                 </div>
               ) : (
                 mergedReports.map((rep) => {
@@ -1367,13 +1362,13 @@ function App() {
                                   hour: "2-digit",
                                   minute: "2-digit",
                                 })
-                              : "Recently analyzed"}
+                              : t.historyRecent}
                           </span>
                           <span>•</span>
                           <span>
                             {rep.report_type === "imaging"
-                              ? `${findingsCount} findings`
-                              : `${biomarkersCount} biomarkers`}
+                              ? `${findingsCount} ${t.historyFindings}`
+                              : `${biomarkersCount} ${t.historyBiomarkers}`}
                           </span>
                         </div>
                       </div>
@@ -1383,15 +1378,15 @@ function App() {
                           className="btn-load-report"
                           onClick={() => loadSavedReport(rep)}
                         >
-                          {t.viewReport || "View Report"}
+                          {t.historyView}
                         </button>
                         {(isLocal || isSynced) && (
                           <button
                             type="button"
                             className="btn-delete-report"
                             onClick={(e) => handleDeleteLocalReport(rep.id, e)}
-                            title="Delete from local storage"
-                            aria-label="Delete report from local storage"
+                            title={t.historyDeleteTitle}
+                            aria-label={t.historyDeleteTitle}
                           >
                             🗑️
                           </button>

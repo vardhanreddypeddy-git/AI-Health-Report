@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./InteractiveChat.css";
 import { API_BASE_URL } from "../config";
 
@@ -173,14 +173,14 @@ export function InteractiveChat({
   getToken,
   t,
 }) {
-  const getGreeting = (filename) => ({
+  const getGreeting = useCallback((filename) => ({
     role: "assistant",
     content: filename
-      ? `Hello! I am your AI Health Assistant. I have analyzed **${filename}**. Ask me anything about your test results, impression, or questions for your doctor!`
-      : "Hello! I am your AI Health Assistant. Upload a medical report or ask me general questions about clinical lab values, diagnostic imaging, and health wellness.",
+      ? t.chatGreetingReport.replace("{filename}", filename)
+      : t.chatGreetingGeneral,
     sources: [],
     created_at: new Date().toISOString(),
-  });
+  }), [t]);
 
   const [messages, setMessages] = useState(() => [getGreeting(reportFilename)]);
   const [inputMessage, setInputMessage] = useState("");
@@ -194,10 +194,8 @@ export function InteractiveChat({
 
   // Keep greeting synchronized if a report is opened or changed
   useEffect(() => {
-    if (messages.length <= 1) {
-      setMessages([getGreeting(reportFilename)]);
-    }
-  }, [reportFilename]);
+    setMessages((current) => current.length <= 1 ? [getGreeting(reportFilename)] : current);
+  }, [reportFilename, getGreeting]);
 
   useEffect(() => {
     if (isOpen) {
@@ -342,10 +340,10 @@ export function InteractiveChat({
   };
 
   const quickPrompts = [
-    { label: "🔺 Abnormal Values", prompt: "Which of my test results are abnormal or outside the standard range?" },
-    { label: "📋 Explain Impression", prompt: "Can you explain the clinical impression of my report in simple words?" },
-    { label: "🩺 Doctor Questions", prompt: "What questions should I ask my doctor during my next consultation?" },
-    { label: "🥗 Diet & Wellness", prompt: "What dietary or lifestyle advice is relevant for these test results?" },
+    { label: t.chatPromptAbnormal, prompt: "Which of my test results are abnormal or outside the standard range?" },
+    { label: t.chatPromptImpression, prompt: "Can you explain the clinical impression of my report in simple words?" },
+    { label: t.chatPromptDoctor, prompt: "What questions should I ask my doctor during my next consultation?" },
+    { label: t.chatPromptDiet, prompt: "What dietary or lifestyle advice is relevant for these test results?" },
   ];
 
   // Helper to render markdown formatting: bold, headings, bullet lines
@@ -400,14 +398,14 @@ export function InteractiveChat({
       <button
         className={`floating-chat-trigger ${isOpen ? "is-active" : ""}`}
         onClick={onToggle}
-        aria-label="Toggle AI Health Assistant Chat"
-        title="Interactive AI Health Assistant"
+        aria-label={isOpen ? t.chatClose : t.chatOpen}
+        title={t.chatAssistant}
       >
         <span className="trigger-icon">{isOpen ? "✕" : "💬"}</span>
         <span className="trigger-label">
-          {isOpen ? "Close Chat" : "Ask Health AI"}
+          {isOpen ? t.chatClose : t.chatOpen}
         </span>
-        {reportId && !isOpen && <span className="trigger-badge">Report Linked</span>}
+        {reportId && !isOpen && <span className="trigger-badge">{t.chatReportLinked}</span>}
       </button>
 
       {/* Slide-out Interactive Chat Drawer */}
@@ -420,10 +418,10 @@ export function InteractiveChat({
             </div>
             <div className="assistant-info">
               <div className="title-row">
-                <h3 className="assistant-name">AI Health Assistant</h3>
+                <h3 className="assistant-name">{t.chatAssistant}</h3>
               </div>
               <p className="assistant-subtitle">
-                {reportFilename ? `Attached: ${reportFilename}` : "Clinical Health Q&A • Educational"}
+                {reportFilename ? `${t.chatAttached}: ${reportFilename}` : t.chatSubtitle}
               </p>
             </div>
           </div>
@@ -431,16 +429,16 @@ export function InteractiveChat({
             <button
               className="chat-action-btn"
               onClick={handleClearHistory}
-              title="Clear Conversation History"
-              aria-label="Clear Chat"
+              title={t.chatClear}
+              aria-label={t.chatClear}
             >
               🗑️
             </button>
             <button
               className="chat-action-btn"
               onClick={onToggle}
-              title="Minimize Chat"
-              aria-label="Close"
+              title={t.chatMinimize}
+              aria-label={t.chatClose}
             >
               ✕
             </button>
@@ -449,7 +447,7 @@ export function InteractiveChat({
 
         {/* Quick Suggestion Chips */}
         <div className="quick-prompts-bar">
-          <span className="prompts-label">Suggestions:</span>
+          <span className="prompts-label">{t.chatSuggestions}</span>
           <div className="prompts-scroll">
             {quickPrompts.map((qp, i) => (
               <button
@@ -474,8 +472,8 @@ export function InteractiveChat({
                 <div className="message-content">
                   <p className="chat-paragraph">
                     {reportFilename
-                      ? `Hello! I am your AI Health Assistant. I have analyzed **${reportFilename}**. Ask me anything about your test results, impression, or questions for your doctor!`
-                      : "Hello! I am your AI Health Assistant. Upload a medical report or ask me general questions about clinical lab values, diagnostic imaging, and health wellness."}
+                      ? t.chatGreetingReport.replace("{filename}", reportFilename)
+                      : t.chatGreetingGeneral}
                   </p>
                 </div>
               </div>
@@ -502,7 +500,7 @@ export function InteractiveChat({
                   {/* Biomarker Sources / Citations */}
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="message-sources-group">
-                      <span className="sources-label">Related Test Values:</span>
+                  <span className="sources-label">{t.chatRelatedValues}</span>
                       <div className="sources-pills">
                         {msg.sources.map((src, sIdx) => (
                           <span
@@ -539,7 +537,7 @@ export function InteractiveChat({
                 <span className="typing-dot"></span>
                 <span className="typing-dot"></span>
                 <span className="typing-dot"></span>
-                <span className="typing-text">Thinking with clinical guidelines...</span>
+                <span className="typing-text">{t.chatThinking}</span>
               </div>
             </div>
           )}
@@ -548,7 +546,7 @@ export function InteractiveChat({
 
         {/* Disclaimer Footer Note */}
         <div className="chat-disclaimer">
-          🔒 Educational AI assistant. Responses are not medical diagnoses. Consult your doctor for treatment.
+          {t.chatDisclaimer}
         </div>
 
         {/* Input Form */}
@@ -565,15 +563,15 @@ export function InteractiveChat({
             className="chat-text-input"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Ask any medical report or health question..."
+            placeholder={t.chatPlaceholder}
             disabled={isLoading}
-            aria-label="Health chat query"
+            aria-label={t.chatAria}
           />
           <button
             type="submit"
             className="chat-send-btn"
             disabled={isLoading || !inputMessage.trim()}
-            aria-label="Send message"
+            aria-label={t.sendButton}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
