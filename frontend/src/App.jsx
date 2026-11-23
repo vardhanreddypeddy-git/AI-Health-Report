@@ -4,6 +4,7 @@ import "./App.css";
 import { getTranslations, getStatusText, LANGUAGES } from "./translations";
 import InteractiveChat from "./components/InteractiveChat";
 import { API_BASE_URL } from "./config";
+import { downloadReportPdf } from "./utils/reportPdf";
 import {
   getLocalStorageReports,
   saveReportToLocalStorage,
@@ -210,97 +211,7 @@ function App() {
   const handleDownloadReportFile = () => {
     if (!analysis) return;
     const name = reportFilename || file?.name || "Medical_Report";
-    const baseName = name.replace(/\.pdf$/i, "");
-    const dateStr = new Date().toLocaleString();
-
-    const biomarkers = analysis.biomarkers || [];
-    const findings = analysis.findings || [];
-    const impression = analysis.impression || "No clear impression identified.";
-    const concern = analysis.concern_level || {};
-    const patterns = analysis.patterns || [];
-    const doctorQuestions = analysis.doctor_questions || [];
-
-    let textContent = `========================================================================\n`;
-    textContent += `AI HEALTH REPORT INTERPRETER - CLINICAL ANALYSIS SUMMARY\n`;
-    textContent += `========================================================================\n\n`;
-    textContent += `Document Name: ${name}\n`;
-    textContent += `Report Type:   ${(analysis.report_type || "laboratory").toUpperCase()}\n`;
-    textContent += `Date Analyzed: ${dateStr}\n\n`;
-
-    textContent += `------------------------------------------------------------------------\n`;
-    textContent += `1. CLINICAL IMPRESSION\n`;
-    textContent += `------------------------------------------------------------------------\n`;
-    textContent += `${impression}\n\n`;
-
-    if (concern.label) {
-      textContent += `Triage Assessment: ${concern.label}\n`;
-      if (concern.description) {
-        textContent += `Assessment Note:   ${concern.description}\n`;
-      }
-      textContent += `\n`;
-    }
-
-    if (biomarkers.length > 0) {
-      textContent += `------------------------------------------------------------------------\n`;
-      textContent += `2. BIOMARKER RESULTS (${biomarkers.length} Tests Analyzed)\n`;
-      textContent += `------------------------------------------------------------------------\n`;
-      biomarkers.forEach((b, idx) => {
-        const statusTag = (b.status || "NORMAL").toUpperCase();
-        textContent += `${idx + 1}. ${b.name}: ${b.value} ${b.unit || ""} [Ref: ${b.reference_range || "N/A"}] -> ${statusTag}\n`;
-        if (b.status_explanation) {
-          textContent += `   Note: ${b.status_explanation}\n`;
-        }
-      });
-      textContent += `\n`;
-    }
-
-    if (findings.length > 0) {
-      textContent += `------------------------------------------------------------------------\n`;
-      textContent += `2. IMAGING FINDINGS\n`;
-      textContent += `------------------------------------------------------------------------\n`;
-      findings.forEach((f, idx) => {
-        textContent += `${idx + 1}. ${f.organ || "Observation"}: ${f.observation || f.text}\n`;
-      });
-      textContent += `\n`;
-    }
-
-    if (patterns.length > 0) {
-      textContent += `------------------------------------------------------------------------\n`;
-      textContent += `3. CLINICAL PATTERNS DETECTED\n`;
-      textContent += `------------------------------------------------------------------------\n`;
-      patterns.forEach((p, idx) => {
-        textContent += `${idx + 1}. ${p.pattern || p.name}: ${p.explanation || p.description || ""}\n`;
-      });
-      textContent += `\n`;
-    }
-
-    if (doctorQuestions.length > 0) {
-      textContent += `------------------------------------------------------------------------\n`;
-      textContent += `4. RECOMMENDED QUESTIONS TO ASK YOUR DOCTOR\n`;
-      textContent += `------------------------------------------------------------------------\n`;
-      doctorQuestions.forEach((q, idx) => {
-        textContent += `${idx + 1}. ${q}\n`;
-      });
-      textContent += `\n`;
-    }
-
-    textContent += `========================================================================\n`;
-    textContent += `MEDICAL DISCLAIMER:\n`;
-    textContent += `This report summary is educational and does not constitute a medical diagnosis.\n`;
-    textContent += `Please consult a qualified healthcare professional regarding clinical care.\n`;
-    textContent += `========================================================================\n`;
-
-    const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${baseName}_Clinical_Analysis.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setMessage(`✓ File "${baseName}_Clinical_Analysis.txt" downloaded to your Downloads folder!`);
+    downloadReportPdf(analysis, name);
   };
 
   const isImaging = analysis?.report_type === "imaging";
@@ -842,10 +753,10 @@ function App() {
                 type="button"
                 className="btn-download-report"
                 onClick={handleDownloadReportFile}
-                title="Download clinical analysis file directly to your laptop's Downloads folder"
+                title="Download the analyzed report as a PDF"
               >
-                <span className="save-btn-icon">📥</span>
-                <span>Download to PC</span>
+                <span className="save-btn-icon">📄</span>
+                <span>Download as PDF</span>
               </button>
               <button
                 type="button"
@@ -1443,11 +1354,6 @@ function App() {
                       <div className="history-item-meta">
                         <div className="history-item-title-row">
                           <span className="history-filename">{rep.filename}</span>
-                          {(isLocal || isSynced) && (
-                            <span className="badge-source badge-source-local" title="Saved locally in browser localStorage">
-                              💾 Local Storage
-                            </span>
-                          )}
                         </div>
                         <div className="history-subdetails">
                           <span className="history-type-chip">{rep.report_type}</span>
