@@ -133,6 +133,27 @@ const translations = {
     disclaimerTitle: "Medical Disclaimer",
     disclaimerText:
       "This tool provides educational information and is not a medical diagnosis. Results should be discussed with a qualified healthcare professional who can consider your symptoms, medical history, and other clinical information.",
+
+    // Saved Reports & LocalStorage
+    savedReports: "Saved Reports",
+    savedReportsModalTitle: "Saved Medical Reports",
+    allReportsTab: "All Reports",
+    localStorageTab: "Local Storage",
+    databaseTab: "Cloud Database",
+    autoSavedBadge: "Auto-saved in LocalStorage",
+    autoSavedToast: "Report automatically saved to LocalStorage",
+    clearLocalReports: "Clear Local Storage",
+    clearLocalConfirm: "Are you sure you want to delete all locally stored medical reports?",
+    exportReports: "Export JSON",
+    deleteReport: "Delete",
+    noSavedReports: "No saved reports found.",
+    noLocalReports: "No local reports saved yet. Upload and analyze any medical report to save it automatically.",
+    closeReport: "Close Report",
+    viewReport: "View Report",
+    restoredFromLocal: "Restored previous report from local storage",
+    storageLocal: "Local Storage",
+    storageDb: "Cloud Database",
+    storageSynced: "Local + Cloud",
   },
 
   // ───────────────────────────────────────────────
@@ -932,7 +953,8 @@ const translations = {
  * Falls back to English if the code is unrecognised.
  */
 export function getTranslations(langCode) {
-  return translations[langCode] || translations.en;
+  const selected = translations[langCode] || {};
+  return { ...translations.en, ...selected };
 }
 
 /**
