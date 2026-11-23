@@ -29,7 +29,6 @@ function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [pastReports, setPastReports] = useState([]);
   const [localReports, setLocalReports] = useState(() => getLocalStorageReports());
-  const [historyTab, setHistoryTab] = useState("all");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [biomarkerFilter, setBiomarkerFilter] = useState("all");
   const [isDragging, setIsDragging] = useState(false);
@@ -166,16 +165,47 @@ function App() {
     });
   }, [localReports, pastReports]);
 
-  // Filtered reports for the history modal based on active tab
-  const filteredHistoryReports = useMemo(() => {
-    if (historyTab === "local") {
-      return mergedReports.filter((r) => r.source === "localStorage" || r.source === "synced");
+  // Check if currently displayed report is saved permanently in browser localStorage
+  const isReportSavedLocally = useMemo(() => {
+    if (!analysis) return false;
+    return localReports.some(
+      (r) =>
+        (reportId && String(r.id) === String(reportId)) ||
+        (r.filename === reportFilename &&
+          (r.biomarkers || []).length === (analysis.biomarkers || []).length)
+    );
+  }, [localReports, reportId, reportFilename, analysis]);
+
+  const handleSaveToPermanentLocalStorage = () => {
+    if (!analysis) return;
+    const effectiveId = reportId || `local_${Date.now()}`;
+    const effectiveName = reportFilename || file?.name || "Medical Report";
+    saveReportToLocalStorage({
+      id: effectiveId,
+      filename: effectiveName,
+      report_type: analysis.report_type || "laboratory",
+      language,
+      analysis,
+      created_at: new Date().toISOString(),
+      source: "localStorage",
+    });
+    setLocalReports(getLocalStorageReports());
+    setMessage(`✓ "${effectiveName}" saved permanently to this laptop's local storage!`);
+  };
+
+  const handleRemoveFromPermanentLocalStorage = () => {
+    const target = localReports.find(
+      (r) =>
+        (reportId && String(r.id) === String(reportId)) ||
+        r.filename === reportFilename
+    );
+    if (!target) return;
+    if (window.confirm(`Remove "${target.filename}" from this laptop's permanent local storage?`)) {
+      deleteLocalStorageReport(target.id);
+      setLocalReports(getLocalStorageReports());
+      setMessage(`"${target.filename}" removed from your laptop's local storage.`);
     }
-    if (historyTab === "cloud") {
-      return mergedReports.filter((r) => r.source === "database" || r.source === "synced");
-    }
-    return mergedReports;
-  }, [mergedReports, historyTab]);
+  };
 
   const isImaging = analysis?.report_type === "imaging";
 
@@ -265,16 +295,15 @@ function App() {
       const effectiveFilename = data.filename || file?.name || "Medical Report";
       setReportFilename(effectiveFilename);
 
-      // Automatically save AI-analyzed report to localStorage
-      saveReportToLocalStorage({
-        id: data.report_id,
+      // Cache active report so a page refresh preserves view
+      setActiveReportInLocalStorage({
+        id: data.report_id || `temp_${Date.now()}`,
         filename: effectiveFilename,
         report_type: data.analysis?.report_type || "laboratory",
         language,
         analysis: data.analysis,
-        source: data.report_id ? "synced" : "localStorage",
+        created_at: new Date().toISOString(),
       });
-      setLocalReports(getLocalStorageReports());
 
       setMessage(t.reportSuccess);
       fetchPastReports();
@@ -692,9 +721,27 @@ function App() {
 
           {analysis && (
             <div className="dashboard-actions-row">
-              <span className="badge-autosaved" title="Report is automatically saved in your browser's localStorage">
-                💾 {t.autoSavedBadge || "Auto-saved in LocalStorage"}
-              </span>
+              {isReportSavedLocally ? (
+                <button
+                  type="button"
+                  className="btn-saved-localstorage"
+                  onClick={handleRemoveFromPermanentLocalStorage}
+                  title="Stored permanently on your laptop browser. Click to remove from local storage."
+                >
+                  <span className="save-btn-icon">✓</span>
+                  <span>Saved on This Laptop</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-add-localstorage"
+                  onClick={handleSaveToPermanentLocalStorage}
+                  title="Save permanently to this laptop's browser localStorage"
+                >
+                  <span className="save-btn-icon">💾</span>
+                  <span>Add to My Local Storage (This Laptop)</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="btn-chat-trigger-top"
@@ -1254,72 +1301,34 @@ function App() {
               </button>
             </div>
 
-            {/* Modal Toolbar: Tabs & LocalStorage Actions */}
+            {/* Modal Toolbar: All Reports & Export */}
             <div className="history-modal-toolbar">
-              <div className="history-modal-tabs">
-                <button
-                  type="button"
-                  className={`history-tab-btn ${historyTab === "all" ? "active" : ""}`}
-                  onClick={() => setHistoryTab("all")}
-                >
-                  {t.allReportsTab || "All Reports"} ({mergedReports.length})
-                </button>
-                <button
-                  type="button"
-                  className={`history-tab-btn ${historyTab === "local" ? "active" : ""}`}
-                  onClick={() => setHistoryTab("local")}
-                >
-                  💾 {t.localStorageTab || "Local Storage"} ({localReports.length})
-                </button>
-                {pastReports.length > 0 && (
-                  <button
-                    type="button"
-                    className={`history-tab-btn ${historyTab === "cloud" ? "active" : ""}`}
-                    onClick={() => setHistoryTab("cloud")}
-                  >
-                    ☁️ {t.databaseTab || "Cloud Database"} ({pastReports.length})
-                  </button>
-                )}
-              </div>
-
+              <span className="history-all-reports-label">
+                {t.allReportsTab || "All Reports"} ({mergedReports.length})
+              </span>
               <div className="history-toolbar-actions">
                 {localReports.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn-history-tool"
-                      onClick={exportReportsAsJSON}
-                      title="Download JSON backup of local reports"
-                    >
-                      📥 {t.exportReports || "Export JSON"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-history-tool btn-danger-tool"
-                      onClick={handleClearAllLocalReports}
-                      title="Delete all reports saved in local storage"
-                    >
-                      🗑️ {t.clearLocalReports || "Clear Local"}
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className="btn-history-tool"
+                    onClick={exportReportsAsJSON}
+                    title="Download JSON backup of local reports"
+                  >
+                    📥 {t.exportReports || "Export JSON"}
+                  </button>
                 )}
               </div>
             </div>
 
             <div className="history-modal-body">
-              {filteredHistoryReports.length === 0 ? (
+              {mergedReports.length === 0 ? (
                 <div className="history-empty-text">
-                  <p>
-                    {historyTab === "local"
-                      ? (t.noLocalReports || "No local reports saved yet. Upload and analyze any medical report to save it automatically.")
-                      : (t.noSavedReports || "No saved reports found.")}
-                  </p>
+                  <p>{t.noSavedReports || "No saved reports found."}</p>
                 </div>
               ) : (
-                filteredHistoryReports.map((rep) => {
+                mergedReports.map((rep) => {
                   const isLocal = rep.source === "localStorage";
                   const isSynced = rep.source === "synced";
-                  const isDb = rep.source === "database";
 
                   const biomarkersCount = (rep.biomarkers || rep.analysis?.biomarkers || []).length;
                   const findingsCount = (rep.findings || rep.analysis?.findings || []).length;
@@ -1329,20 +1338,9 @@ function App() {
                       <div className="history-item-meta">
                         <div className="history-item-title-row">
                           <span className="history-filename">{rep.filename}</span>
-                          {/* Storage Source Badges */}
-                          {isLocal && (
+                          {(isLocal || isSynced) && (
                             <span className="badge-source badge-source-local" title="Saved locally in browser localStorage">
                               💾 Local Storage
-                            </span>
-                          )}
-                          {isSynced && (
-                            <span className="badge-source badge-source-synced" title="Saved in localStorage and synced to cloud">
-                              ✓ Local + Cloud
-                            </span>
-                          )}
-                          {isDb && (
-                            <span className="badge-source badge-source-cloud" title="Saved in PostgreSQL cloud database">
-                              ☁️ Database
                             </span>
                           )}
                         </div>
