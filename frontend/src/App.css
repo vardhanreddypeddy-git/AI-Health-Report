@@ -2291,19 +2291,93 @@
   transform: scale(1.05);
 }
 
-/* LocalStorage Auto-save & Header Badges */
-.badge-autosaved {
+.history-all-reports-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #334155;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-  padding: 6px 12px;
+  gap: 6px;
+}
+
+/* Add to My Local Storage Button & Status */
+.btn-add-localstorage {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 7px 15px;
   border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+  transition: all 0.2s ease;
   white-space: nowrap;
+}
+
+.btn-add-localstorage:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.btn-saved-localstorage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  padding: 7px 15px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-saved-localstorage:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.btn-saved-localstorage .save-btn-icon {
+  font-weight: 800;
+  color: #059669;
+}
+
+.btn-saved-localstorage:hover .save-btn-icon {
+  color: #b91c1c;
+}
+
+.btn-download-report {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-download-report:hover {
+  background: #f1f5f9;
+  border-color: #0284c7;
+  color: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.15);
 }
 
 .btn-close-report {
