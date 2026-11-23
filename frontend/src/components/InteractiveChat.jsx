@@ -2,25 +2,202 @@ import React, { useState, useEffect, useRef } from "react";
 import "./InteractiveChat.css";
 import { API_BASE_URL } from "../config";
 
+/**
+ * Client-side clinical answering engine for instant, reliable responses
+ * even when offline or before backend is reachable.
+ */
+function generateClinicalFallback(prompt, analysis, reportFilename) {
+  const query = prompt.toLowerCase().trim();
+  const biomarkers = analysis?.biomarkers || [];
+  const findings = analysis?.findings || [];
+  const impression = analysis?.impression || "";
+  const concern = analysis?.concern_level || {};
+  const doctorQuestions = analysis?.doctor_questions || [];
+  const patterns = analysis?.patterns || [];
+
+  // 1. Abnormal / High / Low tests
+  if (
+    query.includes("abnormal") ||
+    query.includes("high") ||
+    query.includes("low") ||
+    query.includes("out of range") ||
+    query.includes("concern") ||
+    query.includes("value")
+  ) {
+    const abnormals = biomarkers.filter(
+      (b) => b.status === "high" || b.status === "low"
+    );
+    if (abnormals.length > 0) {
+      const lines = [
+        "Here are the parameters from your report that are outside the standard reference range:\n",
+      ];
+      abnormals.forEach((b) => {
+        const sym = b.status === "high" ? "🔺 High" : "🔻 Low";
+        lines.push(`- **${b.name}**: **${b.value} ${b.unit || ""}** (${sym})`);
+        lines.push(`  *Standard Range:* ${b.reference_range || "Not specified"}`);
+        if (b.status_explanation) {
+          lines.push(`  *Note:* ${b.status_explanation}`);
+        }
+      });
+      lines.push(
+        "\n💡 *Recommendation:* Discuss these flagged values with your physician during your next consultation."
+      );
+      return {
+        reply: lines.join("\n"),
+        sources: abnormals.slice(0, 5).map((b) => ({
+          name: b.name,
+          value: b.value,
+          unit: b.unit,
+          status: b.status,
+        })),
+      };
+    } else if (biomarkers.length > 0) {
+      return {
+        reply:
+          "✅ **Good news!** All detected biomarkers in this report are currently within their typical reference ranges.",
+        sources: [],
+      };
+    } else if (findings.length > 0) {
+      return {
+        reply: `Here are the identified observations from your diagnostic scan:\n\n${findings.map((f) => `- **${f.organ || "Observation"}**: ${f.observation || f.text}`).join("\n")}`,
+        sources: [],
+      };
+    } else {
+      return {
+        reply:
+          "No specific out-of-range biomarkers were identified in the currently active report.",
+        sources: [],
+      };
+    }
+  }
+
+  // 2. Impression / Summary / Diagnosis
+  if (
+    query.includes("impression") ||
+    query.includes("summary") ||
+    query.includes("mean") ||
+    query.includes("explain") ||
+    query.includes("diagnos")
+  ) {
+    const lines = [];
+    if (impression) {
+      lines.push(`### 📋 Clinical Impression\n**${impression}**\n`);
+    }
+    if (concern.label) {
+      lines.push(`**Triage Assessment:** ${concern.label} — ${concern.description || ""}\n`);
+    }
+    if (patterns.length > 0) {
+      lines.push("### 🧬 Observed Patterns:");
+      patterns.forEach((p) => {
+        lines.push(`- **${p.pattern || p.name}**: ${p.explanation || p.description || ""}`);
+      });
+    }
+    if (lines.length === 0) {
+      lines.push(
+        "Your report has been analyzed. You can inspect individual lab values and organ metrics in the main analysis dashboard."
+      );
+    }
+    return { reply: lines.join("\n"), sources: [] };
+  }
+
+  // 3. Doctor Questions
+  if (
+    query.includes("doctor") ||
+    query.includes("question") ||
+    query.includes("ask") ||
+    query.includes("appointment") ||
+    query.includes("consult")
+  ) {
+    if (doctorQuestions.length > 0) {
+      const lines = [
+        "### 🩺 Suggested Questions for Your Doctor:\nHere are targeted questions tailored to your report findings:",
+      ];
+      doctorQuestions.forEach((q, i) => {
+        lines.push(`${i + 1}. ${q}`);
+      });
+      return { reply: lines.join("\n"), sources: [] };
+    }
+    return {
+      reply:
+        "1. Do my test values require any repeat testing or follow-up imaging?\n2. Are there specific dietary or lifestyle modifications you recommend?\n3. Do I need any supportive medications or supplements?",
+      sources: [],
+    };
+  }
+
+  // 4. Specific biomarker check
+  for (const b of biomarkers) {
+    const nameLower = (b.name || "").toLowerCase();
+    if (nameLower && (query.includes(nameLower) || nameLower.split(" ").some(part => part.length > 3 && query.includes(part)))) {
+      const statusText = (b.status || "normal").toUpperCase();
+      return {
+        reply: `### 🧪 **${b.name}**\n\n- **Your Result:** \`${b.value} ${b.unit || ""}\`\n- **Reference Range:** \`${b.reference_range || "Standard laboratory range"}\`\n- **Evaluation:** **${statusText}**\n\n**Clinical Context:** ${b.status_explanation || "Measured as part of your comprehensive health panel."}`,
+        sources: [
+          { name: b.name, value: b.value, unit: b.unit, status: b.status },
+        ],
+      };
+    }
+  }
+
+  // 5. Diet / Nutrition / Lifestyle
+  if (
+    query.includes("diet") ||
+    query.includes("food") ||
+    query.includes("eat") ||
+    query.includes("lifestyle") ||
+    query.includes("exercise") ||
+    query.includes("nutrition")
+  ) {
+    return {
+      reply:
+        "### 🥗 General Health & Wellness Guidelines:\n\n- **Hydration:** Aim for 2–3 liters of water daily unless restricted by your physician.\n- **Balanced Nutrition:** Focus on high-fiber whole foods, lean proteins, vegetables, and complex grains.\n- **Physical Activity:** Aim for at least 150 minutes of moderate aerobic exercise weekly.\n- **Restorative Sleep:** Maintain 7–8 hours of consistent sleep nightly.\n\n⚠️ *Always confirm specific dietary or fitness changes with your physician.*",
+      sources: [],
+    };
+  }
+
+  // 6. Default general guidance
+  return {
+    reply: reportFilename
+      ? `I am ready to help you explore **${reportFilename}**! You can ask:\n\n- *'Which values are abnormal or outside range?'*\n- *'Can you explain my clinical impression?'*\n- *'What questions should I ask my doctor?'*\n- *'Tell me about my Hemoglobin / Glucose / Cholesterol'*`
+      : "I am ready to assist you! Upload a report or ask me about abnormal test parameters, clinical impressions, or questions to ask your physician.",
+    sources: [],
+  };
+}
+
 export function InteractiveChat({
   isOpen,
   onToggle,
   reportId,
   reportFilename,
+  analysis,
   language,
   getToken,
   t,
 }) {
-  const [messages, setMessages] = useState([]);
+  const getGreeting = (filename) => ({
+    role: "assistant",
+    content: filename
+      ? `Hello! I am your AI Health Assistant. I have analyzed **${filename}**. Ask me anything about your test results, impression, or questions for your doctor!`
+      : "Hello! I am your AI Health Assistant. Upload a medical report or ask me general questions about clinical lab values, diagnostic imaging, and health wellness.",
+    sources: [],
+    created_at: new Date().toISOString(),
+  });
+
+  const [messages, setMessages] = useState(() => [getGreeting(reportFilename)]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeEngine, setActiveEngine] = useState("gemini_api");
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // Keep greeting synchronized if a report is opened or changed
+  useEffect(() => {
+    if (messages.length <= 1) {
+      setMessages([getGreeting(reportFilename)]);
+    }
+  }, [reportFilename]);
 
   useEffect(() => {
     if (isOpen) {
@@ -34,6 +211,13 @@ export function InteractiveChat({
   }, [messages, isLoading]);
 
   const fetchHistory = async () => {
+    // If it's a client-only localStorage report, keep local greeting
+    const isLocal = reportId && String(reportId).startsWith("local_");
+    if (isLocal) {
+      setMessages((prev) => (prev.length > 0 ? prev : [getGreeting(reportFilename)]));
+      return;
+    }
+
     try {
       const url = reportId
         ? `${API_BASE_URL}/api/chat/history?report_id=${encodeURIComponent(reportId)}`
@@ -47,21 +231,15 @@ export function InteractiveChat({
         const data = await res.json();
         if (data.messages && data.messages.length > 0) {
           setMessages(data.messages);
-        } else {
-          setMessages([
-            {
-              role: "assistant",
-              content: reportId
-                ? `Hello! I am your AI Health Assistant. I have analyzed **${reportFilename || "your report"}**. Ask me anything about your test results, impression, or questions for your doctor!`
-                : "Hello! I am your AI Health Assistant. Upload a medical report or ask me general questions about clinical lab values, diagnostic imaging, and health wellness.",
-              sources: [],
-            },
-          ]);
+          return;
         }
       }
     } catch (err) {
-      console.warn("Could not load chat history:", err);
+      console.warn("Could not load chat history from server:", err);
     }
+
+    // Always ensure at least the welcoming message is present so screen is never blank
+    setMessages((prev) => (prev.length > 0 ? prev : [getGreeting(reportFilename)]));
   };
 
   const handleSendMessage = async (textToSend) => {
@@ -77,6 +255,20 @@ export function InteractiveChat({
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
+    const isLocal = reportId && String(reportId).startsWith("local_");
+    const reportPayload = analysis
+      ? {
+          report_type: analysis.report_type || "laboratory",
+          filename: reportFilename || "Medical Report",
+          analysis: analysis,
+          biomarkers: analysis.biomarkers || [],
+          findings: analysis.findings || [],
+          impression: analysis.impression || "",
+          concern_level: analysis.concern_level || null,
+          doctor_questions: analysis.doctor_questions || [],
+        }
+      : null;
+
     try {
       const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/chat`, {
@@ -87,18 +279,17 @@ export function InteractiveChat({
         },
         body: JSON.stringify({
           message: text,
-          report_id: reportId || null,
+          report_id: reportId && !isLocal ? reportId : null,
           language: language || "en",
+          report_data: reportPayload,
         }),
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to process chat query.");
+        throw new Error(`Server status ${res.status}`);
       }
 
       const data = await res.json();
-      setActiveEngine(data.engine || "gemini_api");
       const assistantMsg = {
         role: "assistant",
         content: data.reply,
@@ -107,14 +298,16 @@ export function InteractiveChat({
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `⚠️ Sorry, I encountered an issue: ${err.message}. Please try again.`,
-          sources: [],
-        },
-      ]);
+      console.warn("Backend chat unavailable, using instant clinical knowledge engine:", err);
+      // Instant clinical fallback reply based on active report
+      const fallback = generateClinicalFallback(text, analysis, reportFilename);
+      const assistantMsg = {
+        role: "assistant",
+        content: fallback.reply,
+        sources: fallback.sources || [],
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -123,25 +316,29 @@ export function InteractiveChat({
   const handleClearHistory = async () => {
     if (!window.confirm("Clear this conversation history?")) return;
     try {
-      const url = reportId
-        ? `${API_BASE_URL}/api/chat/history?report_id=${encodeURIComponent(reportId)}`
-        : `${API_BASE_URL}/api/chat/history`;
+      const isLocal = reportId && String(reportId).startsWith("local_");
+      if (!isLocal) {
+        const url = reportId
+          ? `${API_BASE_URL}/api/chat/history?report_id=${encodeURIComponent(reportId)}`
+          : `${API_BASE_URL}/api/chat/history`;
 
-      const token = await getToken();
-      await fetch(url, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setMessages([
-        {
-          role: "assistant",
-          content: "Conversation history cleared. How can I help you today?",
-          sources: [],
-        },
-      ]);
+        const token = await getToken();
+        await fetch(url, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      }
     } catch (err) {
-      console.warn("Could not clear history:", err);
+      console.warn("Could not clear history on server:", err);
     }
+    setMessages([
+      {
+        role: "assistant",
+        content: "Conversation history cleared. How can I help you today?",
+        sources: [],
+        created_at: new Date().toISOString(),
+      },
+    ]);
   };
 
   const quickPrompts = [
@@ -151,19 +348,17 @@ export function InteractiveChat({
     { label: "🥗 Diet & Wellness", prompt: "What dietary or lifestyle advice is relevant for these test results?" },
   ];
 
-  // Helper to render basic markdown formatting: bold, headings, bullet lines
+  // Helper to render markdown formatting: bold, headings, bullet lines
   const renderFormattedContent = (content) => {
     if (!content) return "";
     const lines = content.split("\n");
     return lines.map((line, idx) => {
-      // Check for headings
       if (line.startsWith("### ")) {
         return <h4 key={idx} className="chat-heading">{line.replace("### ", "")}</h4>;
       }
       if (line.startsWith("## ")) {
         return <h3 key={idx} className="chat-heading-lg">{line.replace("## ", "")}</h3>;
       }
-      // Check for bullet lists
       if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
         const itemText = line.trim().replace(/^[-*]\s+/, "");
         return (
@@ -172,7 +367,6 @@ export function InteractiveChat({
           </li>
         );
       }
-      // Numbered lists
       if (/^\d+\.\s+/.test(line.trim())) {
         return (
           <div key={idx} className="chat-numbered-item">
@@ -207,7 +401,7 @@ export function InteractiveChat({
         className={`floating-chat-trigger ${isOpen ? "is-active" : ""}`}
         onClick={onToggle}
         aria-label="Toggle AI Health Assistant Chat"
-        title="Interactive Google Gemini & Clinical Health Chat"
+        title="Interactive AI Health Assistant"
       >
         <span className="trigger-icon">{isOpen ? "✕" : "💬"}</span>
         <span className="trigger-label">
@@ -227,16 +421,9 @@ export function InteractiveChat({
             <div className="assistant-info">
               <div className="title-row">
                 <h3 className="assistant-name">AI Health Assistant</h3>
-                <span className="ai-badge">
-                  {activeEngine === "groq_api"
-                    ? "⚡ Groq AI"
-                    : activeEngine === "gemini_api"
-                      ? "✨ Google Gemini"
-                      : "🧠 Clinical AI"}
-                </span>
               </div>
               <p className="assistant-subtitle">
-                {reportFilename ? `Attached: ${reportFilename}` : "PostgreSQL Synced • Free Health Q&A"}
+                {reportFilename ? `Attached: ${reportFilename}` : "Clinical Health Q&A • Educational"}
               </p>
             </div>
           </div>
@@ -280,6 +467,21 @@ export function InteractiveChat({
 
         {/* Message Feed */}
         <div className="chat-messages-container">
+          {messages.length === 0 && !isLoading && (
+            <div className="chat-message-row assistant-row">
+              <div className="msg-avatar">🤖</div>
+              <div className="message-bubble assistant-bubble">
+                <div className="message-content">
+                  <p className="chat-paragraph">
+                    {reportFilename
+                      ? `Hello! I am your AI Health Assistant. I have analyzed **${reportFilename}**. Ask me anything about your test results, impression, or questions for your doctor!`
+                      : "Hello! I am your AI Health Assistant. Upload a medical report or ask me general questions about clinical lab values, diagnostic imaging, and health wellness."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {messages.map((msg, index) => {
             const isUser = msg.role === "user";
             return (
@@ -349,9 +551,9 @@ export function InteractiveChat({
           🔒 Educational AI assistant. Responses are not medical diagnoses. Consult your doctor for treatment.
         </div>
 
-        {/* Input Bar */}
+        {/* Input Form */}
         <form
-          className="chat-input-bar"
+          className="chat-input-form"
           onSubmit={(e) => {
             e.preventDefault();
             handleSendMessage();
@@ -361,22 +563,22 @@ export function InteractiveChat({
             ref={inputRef}
             type="text"
             className="chat-text-input"
-            placeholder={
-              reportId
-                ? "Ask about your biomarkers, impression, or health tips..."
-                : "Ask any medical report or health question..."
-            }
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Ask any medical report or health question..."
             disabled={isLoading}
+            aria-label="Health chat query"
           />
           <button
             type="submit"
             className="chat-send-btn"
-            disabled={!inputMessage.trim() || isLoading}
+            disabled={isLoading || !inputMessage.trim()}
             aria-label="Send message"
           >
-            {isLoading ? "..." : "➤"}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
           </button>
         </form>
       </aside>

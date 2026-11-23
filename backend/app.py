@@ -325,9 +325,9 @@ def interactive_chat():
     language = data.get("language", "en")
     client_api_key = data.get("api_key") or request.headers.get("X-Gemini-API-Key")
 
-    # Fetch report context if a specific report is active
-    report_data = None
-    if report_id:
+    # Fetch report context if provided directly or if a specific database report is active
+    report_data = data.get("report_data")
+    if not report_data and report_id and not str(report_id).startswith("local_"):
         report_data = get_report_by_id(report_id=report_id, user_id=user_id)
 
     # Fetch recent conversation history for multi-turn context
@@ -345,17 +345,18 @@ def interactive_chat():
 
     # Save user message and AI response to PostgreSQL
     try:
+        db_report_id = report_id if (report_id and not str(report_id).startswith("local_")) else None
         save_chat_message(
             user_id=user_id,
             role="user",
             content=message,
-            report_id=report_id
+            report_id=db_report_id
         )
         save_chat_message(
             user_id=user_id,
             role="assistant",
             content=chat_result["reply"],
-            report_id=report_id,
+            report_id=db_report_id,
             sources=chat_result["sources"]
         )
     except Exception as db_chat_err:
@@ -378,6 +379,8 @@ def fetch_chat_history():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
     report_id = request.args.get("report_id")
+    if report_id and str(report_id).startswith("local_"):
+        report_id = None
     messages = get_chat_history(user_id=user_id, report_id=report_id)
     return jsonify({"messages": messages})
 
@@ -390,6 +393,8 @@ def clear_user_chat():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
     report_id = request.args.get("report_id")
+    if report_id and str(report_id).startswith("local_"):
+        report_id = None
     success = clear_chat_history(user_id=user_id, report_id=report_id)
     return jsonify({"success": success})
 

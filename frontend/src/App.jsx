@@ -1223,12 +1223,13 @@ function App() {
         </div>
       </footer>
 
-      {/* Floating Interactive Chat Drawer (Google Gemini / Clinical AI) */}
+      {/* Floating Interactive Chat Drawer (Clinical AI Assistant) */}
       <InteractiveChat
         isOpen={isChatOpen}
         onToggle={() => setIsChatOpen((prev) => !prev)}
         reportId={reportId}
         reportFilename={reportFilename}
+        analysis={analysis}
         language={language}
         getToken={getToken}
         t={t}
