@@ -2401,3 +2401,87 @@
   border-color: #fca5a5;
   color: #b91c1c;
 }
+
+@page {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body,
+  #root,
+  .app-shell {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+
+  body {
+    color: #16324f;
+    font-size: 10pt;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .app-header,
+  .hero-section,
+  .dashboard-actions-row,
+  .filter-tab-bar,
+  .chatbot-card,
+  .chat-widget,
+  .interactive-chat,
+  .floating-chat-trigger,
+  .interactive-chat-drawer,
+  .modal-overlay,
+  .status-banner,
+  .app-footer {
+    display: none !important;
+  }
+
+  .dashboard-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .dashboard-header-bar {
+    margin: 0 0 12px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid #bae6fd;
+    box-shadow: none;
+  }
+
+  .biomarkers-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 10px;
+  }
+
+  .biomarker-card,
+  .summary-card,
+  .card,
+  .pattern-item,
+  .knowledge-article,
+  .question-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .biomarker-card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .biomarkers-card,
+  .summary-cards-grid,
+  .patterns-card,
+  .knowledge-card,
+  .doctor-card,
+  .disclaimer-banner {
+    break-inside: avoid-page;
+  }
+}
